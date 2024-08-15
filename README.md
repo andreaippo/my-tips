@@ -32,7 +32,7 @@ Next, set up ssh-agent so that it starts at boot. We will create a user systemd 
 Create the folder to store the unit file:
 `mkdir -p ~/.config/systemd/user`
 
-Create the unit file with its content:
+Create the unit file with its content, by running this command:
 
 ```
 echo '[Unit]
@@ -47,7 +47,7 @@ ExecStart=/usr/bin/ssh-agent -D -a $SSH_AUTH_SOCK
 WantedBy=default.target' >> ~/.config/systemd/user/ssh-agent.service
 ```
 
-This requires the `SSH_AUTH_SOCK` env variable to be set, so add it to your `~/.bash_profile` with this command:
+This requires the `SSH_AUTH_SOCK` env variable to be set, so add it to your `~/.bash_profile` by running this command:
 
 ```
 echo '# For SSH agent systemd user unit
