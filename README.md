@@ -1,4 +1,6 @@
-#  [Guide] ssh-agent + KWallet to store ssh private key passphrases
+# Misc tips
+
+##  [Guide] ssh-agent + KWallet to store ssh private key passphrases
 
 I finally managed to get a reliable ssh-agent configuration which stores passphrases of your private keys inside the KWallet so you don’t ever have to enter them again (for example when doing a git pull).
 
