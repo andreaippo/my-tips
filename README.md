@@ -139,3 +139,64 @@ If you try to `git pull` again, no passphrase will be requested, but we had alre
 What's new is that now no passphrase will be requested even if you reboot or re-login, because the KDE Wallet will provide it from now on.
 
 Enjoy!
+
+## Rootless podman on Linux with bridge network and reaching host services from containers
+
+### The problem
+
+Podman 5 brought some major changes to [networking](https://blog.podman.io/2024/03/podman-5-0-breaking-changes-in-detail/).
+
+As a result, my setup stopped working.
+
+I had a bunch of containers (`Kafka`, `Mongo`, `Redis`, ...) within the same pod and attached to a custom bridge network I 
+had previously created with `podman network create <name>`.
+These containers are started by a `compose` file containing a global `networks` directive, e.g.:
+
+```yaml
+networks:
+  my-bridge:
+    external: true
+```
+
+Then I had another container (`a`) outside of that pod, but attached to the same network.
+`a` is started with a `Dockerfile` which provides `--net=my-bridge` to the `docker run` command.
+
+Communication between `a` and containers in the pod is not an issue, and reaching any of these containers from the 
+host is also not a problem.
+
+The problematic bit was that `a` could no longer reach a service running on my host.
+
+`a` is a webapp that internally references my host with the `host.docker.internal` alias; this alias should allow 
+container traffic headed there to be routed to the host; this also requires an extra arg to be provided to `docker 
+run`: `--add-host=host.docker.internal:host-gateway`.
+
+This trick no longer works, though.
+
+What you have to do now:
+
+- the host alias to use (at least for `podman`) is `host.containers.internal`, so let your app (`a`) refer to your 
+  host via this alias
+- no need to start the container for `a` with the `--add-host` arg anymore, so remove it; `podman` will know how to 
+  deal with `host.containers.internal` when it encounters it
+- crucial part (should be temporary): change the `pasta` configuration. `pasta` is the default rootless 
+  networking tool used by `podman` (as of version 5). Its configuration is in `~/.config/containers/containers.conf` 
+  (create the file if it doesn't exist). This file should contain:
+  ```yaml
+  [network]
+  pasta_options = ["-a", "10.0.2.0", "-n", "24", "-g", "10.0.2.2", "--dns-forward", "10.0.2.3"]
+  ```
+  You can take these exact values, as I could confirm they work. A reboot is required for the changes to take effect.
+
+With these changes, you should get again multiple containers attached to the same bridge network and talking to each 
+other, reachable from the host, *and*  able to reach the host as well.
+
+Hope this helped/enjoy!
+
+P.S. I could have gone back to using root mode and just attach everything to the host network (`--net=host`), but 
+AFAIK this option is only available to Linux users (which I am, but my team mates are not) and therefore quite limiting 
+for team work. This solution should make this scenario work for Linux and Mac users alike.
+
+### Futher reading
+https://github.com/containers/podman/discussions/23776
+
+https://github.com/containers/podman/issues/22653
