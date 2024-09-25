@@ -34,45 +34,54 @@ Next, set up ssh-agent so that it starts at boot. We will create a user systemd 
 Create the folder to store the unit file:
 `mkdir -p ~/.config/systemd/user`
 
-Create the unit file with its content, by running this command:
+Create the unit file, e.g. `my-ssh-agent.service` with the following content:
 
 ```
-echo '[Unit]
+[Unit]
 Description=SSH key agent
 
 [Service]
 Type=simple
-Environment=SSH_AUTH_SOCK=%t/ssh-agent.socket
-ExecStart=/usr/bin/ssh-agent -D -a $SSH_AUTH_SOCK
+ExecStart=/usr/bin/ssh-agent -D -a ${XDG_RUNTIME_DIR}/ssh-agent.socket
 
 [Install]
-WantedBy=default.target' >> ~/.config/systemd/user/ssh-agent.service
+WantedBy=default.target
 ```
 
-This requires the `SSH_AUTH_SOCK` env variable to be set, so add it to your `~/.bash_profile` by running this command:
+You will also need to set the `SSH_AUTH_SOCK` variable for your environment. You can do this via `~/.bash_profile` or `~/.zprofile` or, if those files source/import `~/.profile`, do it there preferrably (this way the variable declaration will be applied on logon even if you switch shells from `bash` to `zsh`, for example.
+
+This requires your `.bash_profile` or `.zprofile` to contain something like:
 
 ```
-echo '# For SSH agent systemd user unit
-export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"' >> ~/.bash_profile
+if [[ -f ~/.profile ]]; then
+    source ~/.profile
+fi
 ```
 
-(note: this env var is also exported inside the systemd unit above - I couldn't figure out why, but it's needed in both places)
+At this point you can add the following to your `.profile`:
 
-Enable the service we just created:
+```
+# For SSH agent systemd user unit
+export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"
+```
+
+Of course if you don't have a `.profile`, you can add that same snippet directly to `.bash_profile`, `.zprofile` or whatever equivalent profile file for your shell.
+
+Now let's enable the service we just created:
 
 `systemctl --user enable --now ssh-agent.service`
 
-Now confirm the service is running with:
+and confirm it's running. No errors or messages saying the process has exited should be present:
 
 `systemctl --user status ssh-agent.service`
 
-And check identities known/cached by the ssh-agent:
+Then check identities known/cached by the ssh-agent with:
 
 `ssh-add -l`
 
 It should say that no identites are known at the moment.
 
-Now thanks to `AddKeysToAgent yes` mentioned earlier, as soon as you unlock a private key by entering its passphrase, the ssh agent will also remember the passphrase as long as it's running (which, unless it crashes, means for the current session).
+Now thanks to `AddKeysToAgent yes` mentioned earlier, as soon as you unlock a private key by entering its passphrase, the ssh agent will also remember the passphrase as long as it's running (which, unless it crashes, means for the entire session).
 
 You can confirm this with a `git pull`, enter your passphrase when prompted, then run again `ssh-add -l`, and this time you should see something like:
 
